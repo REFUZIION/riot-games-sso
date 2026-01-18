@@ -1,0 +1,48 @@
+name: Deploy to Packagist
+
+on:
+  release:
+    types: [created]
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Packagist
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: curl
+      
+      - name: Validate composer.json
+        run: composer validate --strict
+      
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+      
+      - name: Notify Packagist
+        if: env.PACKAGIST_USERNAME != '' && env.PACKAGIST_TOKEN != ''
+        env:
+          PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
+          PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"repository":{"url":"https://packagist.org/packages/fuziion/riot-games-sso"}}' \
+            "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}"
+      
+      - name: Packagist Webhook (Alternative)
+        if: env.PACKAGIST_WEBHOOK_URL != ''
+        env:
+          PACKAGIST_WEBHOOK_URL: ${{ secrets.PACKAGIST_WEBHOOK_URL }}
+        run: |
+          curl -X POST "${PACKAGIST_WEBHOOK_URL}"
